@@ -1,65 +1,130 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { StepWrapper } from "@/components/StepWrapper";
+import { Step1GenomeInput } from "@/components/steps/Step1GenomeInput";
+import { Step2JobSelection } from "@/components/steps/Step2JobSelection";
+import { Step3Summary } from "@/components/steps/Step3Summary";
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+  const [currentStep, setCurrentStep] = useState(0);
+  const [genome, setGenome] = useState("");
+  const [selectedJob, setSelectedJob] = useState<string | undefined>();
+  const [isLoadingGenome, setIsLoadingGenome] = useState(false);
+  const [genomeError, setGenomeError] = useState<string | null>(null);
+
+  const handleContinue = async () => {
+    // If we're on step 1, fetch genome data before proceeding
+    if (currentStep === 1) {
+      if (!genome.trim()) {
+        setGenomeError("Please enter a username");
+        return;
+      }
+
+      setIsLoadingGenome(true);
+      setGenomeError(null);
+
+      try {
+        const response = await fetch(`/api/genome/${genome}`);
+        
+        if (response.status === 404) {
+          setGenomeError("Genome not found. Please check the username and try again.");
+          setIsLoadingGenome(false);
+          return;
+        }
+
+        if (!response.ok) {
+          const data = await response.json();
+          setGenomeError(data.error || "Failed to fetch genome data. Please try again.");
+          setIsLoadingGenome(false);
+          return;
+        }
+
+        // Success - proceed to next step
+        setGenomeError(null);
+        setCurrentStep(currentStep + 1);
+      } catch (error) {
+        setGenomeError("An error occurred while fetching genome data. Please try again.");
+      } finally {
+        setIsLoadingGenome(false);
+      }
+    } else if (currentStep < 3) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep === 3) {
+      // Last step: reset all data and go to step 0
+      setGenome("");
+      setSelectedJob(undefined);
+      setCurrentStep(0);
+    } else if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const steps = [
+    {
+      title: "Welcome",
+      description: "Get started with your personalized job application journey.",
+      component: <div />,
+      continueButtonText: "Start",
+      showBack: false,
+    },
+    {
+      title: "Input your genome",
+      description: "Enter your genome information to get started.",
+      component: (
+        <Step1GenomeInput
+          onGenomeChange={setGenome}
+          initialValue={genome}
+          error={genomeError}
+          onErrorClear={() => setGenomeError(null)}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      ),
+    },
+    {
+      title: "Select the job",
+      description: "Choose the job position you're interested in.",
+      component: (
+        <Step2JobSelection
+          onJobSelect={setSelectedJob}
+          initialSelected={selectedJob}
+          username={genome}
+        />
+      ),
+    },
+    {
+      title: "Generate summary",
+      description: "Review your personalized summary based on your inputs.",
+      component: <Step3Summary genome={genome} selectedJob={selectedJob} />,
+      showContinue: false,
+      backButtonText: "Start Over",
+    },
+  ];
+
+  const currentStepData = steps[currentStep];
+
+  return (
+    <div className="px-8 py-6">
+      <StepWrapper
+        title={currentStepData.title}
+        description={currentStepData.description}
+        onContinue={handleContinue}
+        onBack={handleBack}
+        showContinue={currentStepData.showContinue !== false}
+        showBack={
+          currentStepData.showBack !== undefined
+            ? currentStepData.showBack
+            : currentStep > 0
+        }
+        continueButtonText={currentStepData.continueButtonText}
+        backButtonText={currentStepData.backButtonText}
+        isLoading={isLoadingGenome && currentStep === 1}
+      >
+        {currentStepData.component}
+      </StepWrapper>
     </div>
   );
 }
