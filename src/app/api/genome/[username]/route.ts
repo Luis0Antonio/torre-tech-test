@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { username: string } }
+  { params }: { params: Promise<{ username: string }> }
 ) {
   try {
     const { username } = await params;
@@ -17,11 +17,8 @@ export async function GET(
       );
     }
 
-    console.log(`[API] Fetching genome data for username: ${username}`);
     const data = await searchGenome(username);
-    console.log(`[API] Genome data fetched successfully for: ${username}`);
-    console.log("[API] Response data:", JSON.stringify(data, null, 2));
-    
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("[API] Error fetching genome data:", error);
